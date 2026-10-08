@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>訪薬台 — 在宅訪問の薬歴下書き</title>
+  <meta name="description" content="在宅調剤の訪問後に、端末内でSOAP形式の薬歴下書きを作る画面試作です。患者情報は架空です。" />
+  <link rel="icon" href="favicon.svg" type="image/svg+xml" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+JP:wght@400;500;600&family=Shippori+Mincho:wght@500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="boot" id="boot" role="status" aria-live="polite">
+    <div class="boot-copy">
+      <div class="boot-mark">
+        <svg viewBox="0 0 64 64" aria-hidden="true">
+          <rect width="64" height="64" rx="14" fill="#f3ecdf"/>
+          <path d="M10 32 32 16l22 16v18a2 2 0 0 1-2 2H12a2 2 0 0 1-2-2V32z" fill="#14382c"/>
+          <path d="M27 34h10v16H27zM24 40h16v6H24z" fill="#f3ecdf"/>
+        </svg>
+        <div>
+          <p class="eyebrow">Midori Home Pharmacy</p>
+          <strong style="font-family:var(--serif);font-size:20px">みどり在宅薬局</strong>
+        </div>
+      </div>
+      <h1>訪薬台</h1>
+      <p class="boot-lead">訪問の帰りに残した声を、この端末の中だけで文字にし、薬歴の下書きにします。患者の話は外へ出しません。</p>
+      <div class="boot-progress">
+        <div class="boot-bar"><span id="boot-bar"></span></div>
+        <ul class="boot-steps">
+          <li>台帳 <span>院内</span></li>
+          <li>文字起こし <span>端末内</span></li>
+          <li>下書き <span>ローカル</span></li>
+          <li>受け渡し <span>RPAフォルダ</span></li>
+        </ul>
+      </div>
+    </div>
+    <div class="boot-art">
+      <svg class="scene" viewBox="0 0 460 420" aria-hidden="true">
+        <rect x="40" y="70" width="250" height="250" rx="8" fill="#1d5c45"/>
+        <path d="M40 150h250" stroke="#e7c27a" stroke-width="10"/>
+        <text x="62" y="128" fill="#f6f1e7" font-size="28" font-family="serif">薬</text>
+        <rect x="210" y="160" width="200" height="210" rx="120" fill="#f3ecdf"/>
+        <circle cx="310" cy="230" r="28" fill="#14382c"/>
+        <path d="M250 360c20-70 100-70 120 0" fill="#14382c"/>
+        <rect x="70" y="190" width="70" height="90" fill="#f3ecdf"/>
+        <path d="M78 250h54M78 236h54" stroke="#14382c" stroke-width="3"/>
+        <circle cx="150" cy="300" r="36" fill="#b5522a"/>
+        <path d="M150 278v44M128 300h44" stroke="#f6f1e7" stroke-width="6"/>
+      </svg>
+      <div class="boot-caption" id="boot-caption">端末を起こしています</div>
+    </div>
+  </div>
+
+  <div class="app">
+    <header class="topbar">
+      <button class="brand" id="brand" type="button">
+        <svg width="34" height="34" viewBox="0 0 64 64" aria-hidden="true">
+          <rect width="64" height="64" rx="12" fill="#14382c"/>
+          <path d="M12 34 32 18l20 16v16H12V34z" fill="#f3ecdf"/>
+          <path d="M28 36h8v12h-8zM25 40h14v5H25z" fill="#14382c"/>
+        </svg>
+        <span><strong>訪薬台</strong><small>ほうやくだい · 薬歴の下書き</small></span>
+      </button>
+      <div class="top-meta">
+        <span class="pill"><i></i>外部送信オフ</span>
+        <span class="pill hide-sm">Mac mini · 院内</span>
+        <span class="hide-sm" id="today"></span>
+        <div class="who"><b>佐藤 恵</b><span>管理薬剤師 · 架空</span></div>
+      </div>
+    </header>
+
+    <div class="shell">
+      <aside class="side">
+        <div class="side-head"><h2>本日の訪問</h2><span>3件</span></div>
+        <div id="visit-list"></div>
+        <p class="side-note">画面に出ている氏名と数値は、説明用の架空データです。開発中の試験も、実在の患者情報では行いません。</p>
+      </aside>
+
+      <main class="main">
+        <div class="steps">
+          <button class="step" type="button" data-screen="desk"><b>1</b><span>音声と要点</span></button>
+          <button class="step" type="button" data-screen="soap"><b>2</b><span>SOAP下書き</span></button>
+          <button class="step" type="button" data-screen="queue"><b>3</b><span>RPAへ渡す</span></button>
+          <button class="step" type="button" data-screen="log"><b>4</b><span>利用ログ</span></button>
+        </div>
+
+        <section id="desk">
+          <div class="patient-hero">
+            <div class="patient-card">
+              <p class="kicker" id="patient-kicker"></p>
+              <h2 id="patient-name"></h2>
+              <ul class="facts" id="patient-facts"></ul>
+              <div class="stamp">下書き</div>
+            </div>
+            <div class="aside-illu">
+              <svg viewBox="0 0 220 120" aria-hidden="true">
+                <rect x="8" y="28" width="90" height="70" fill="#f3ecdf"/>
+                <path d="M8 48h90" stroke="#e7c27a" stroke-width="6"/>
+                <text x="18" y="44" fill="#f6f1e7" font-size="12" font-family="serif">薬袋</text>
+                <circle cx="150" cy="48" r="16" fill="#f3ecdf"/>
+                <path d="M124 100c8-28 36-28 48 0" fill="#f3ecdf"/>
+                <rect x="176" y="58" width="28" height="36" rx="4" fill="#e7c27a"/>
+              </svg>
+              <p>玄関で薬袋を開き、帰りの車では端末に声を残す。その声は薬局の外へ出ません。</p>
+            </div>
+          </div>
+
+          <div class="work">
+            <div>
+              <section class="panel">
+                <h3>音声メモ</h3>
+                <p class="hint" id="empty-visit">この枠は、訪問が終わってから使います。先に入っている文はありません。</p>
+                <div id="memo-tools">
+                  <p class="hint">端末の中で文字にします。デモでは用意した会話を使います。文はあとから直せます。</p>
+                  <textarea id="memo" class="memo" aria-label="音声メモの文字"></textarea>
+                  <div class="wave" id="wave" aria-hidden="true">
+                    <span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span>
+                  </div>
+                  <div class="row">
+                    <button class="btn" id="use-seed" type="button">この訪問の音声を文字にする</button>
+                  </div>
+                </div>
+              </section>
+              <section class="panel" style="margin-top:12px">
+                <h3>薬剤師の要点</h3>
+                <p class="hint">下書きに残したいものだけチェックします。</p>
+                <div class="points" id="points"></div>
+              </section>
+            </div>
+
+            <section class="soap-sheet">
+              <div class="soap-head">
+                <h3>薬歴の下書き</h3>
+                <span class="pill">S · O · A · P</span>
+              </div>
+              <p class="hint" style="padding-left:8px">文章は候補です。確定するのは薬剤師です。用量の変更は書きません。</p>
+              <div class="soap-grid">
+                <label><span class="letter">S</span><span class="field-name">主観　患者・家族の話</span><textarea id="soap-s"></textarea></label>
+                <label><span class="letter">O</span><span class="field-name">客観　見たこと、測ったこと</span><textarea id="soap-o"></textarea></label>
+                <label><span class="letter">A</span><span class="field-name">評価　今日の整理</span><textarea id="soap-a"></textarea></label>
+                <label><span class="letter">P</span><span class="field-name">計画　次にすること</span><textarea id="soap-p"></textarea></label>
+              </div>
+              <div class="soap-actions">
+                <span class="count" id="count"></span>
+                <div class="row" style="margin:0">
+                  <button class="btn ghost" id="make-btn" type="button">下書きを作る</button>
+                  <button class="btn soft" id="handoff-btn" type="button">院内RPAへ渡す</button>
+                </div>
+              </div>
+            </section>
+          </div>
+        </section>
+
+        <section id="queue-view" hidden>
+          <div class="patient-card" style="margin-bottom:16px">
+            <p class="kicker">受け渡し</p>
+            <h2 style="font-family:var(--serif);font-size:32px;margin:0">院内RPAの入口</h2>
+            <p class="hint">今使っている薬歴入力の自動化へ、ファイルで渡す想定です。宛先は院内のフォルダだけです。</p>
+          </div>
+          <div class="queue">
+            <table>
+              <thead><tr><th>時刻</th><th>患者</th><th>宛先</th><th>状態</th></tr></thead>
+              <tbody id="queue-body"></tbody>
+            </table>
+          </div>
+          <div class="row">
+            <button class="btn ghost" id="copy-payload" type="button">JSONをコピー</button>
+          </div>
+          <pre class="payload" id="payload"></pre>
+        </section>
+
+        <section id="log-view" hidden>
+          <div class="patient-card" style="margin-bottom:16px">
+            <p class="kicker">監査</p>
+            <h2 style="font-family:var(--serif);font-size:32px;margin:0">利用ログ</h2>
+            <p class="hint">誰が、どの操作をしたかだけを残します。音声そのものはログに書きません。</p>
+          </div>
+          <div class="queue">
+            <table>
+              <thead><tr><th>時刻</th><th>操作者</th><th>内容</th><th>外部送信</th></tr></thead>
+              <tbody id="log-body"></tbody>
+            </table>
+          </div>
+        </section>
+      </main>
+    </div>
+  </div>
+
+  <div class="modal-back" id="modal">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+      <h3 id="modal-title">院内へ渡します</h3>
+      <p id="modal-name"></p>
+      <p>下書きを、薬歴入力用RPAの受け渡しフォルダに置きます。インターネット上のサービスへは送りません。</p>
+      <div class="row">
+        <button class="btn ghost" id="modal-cancel" type="button">戻る</button>
+        <button class="btn" id="modal-ok" type="button">受け渡しに入れる</button>
+      </div>
+    </div>
+  </div>
+  <div class="toast" id="toast" role="status"></div>
+  <script src="app.js"></script>
+</body>
+</html>
